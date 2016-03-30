@@ -1,0 +1,1034 @@
+'++LotusScript Development Environment:2:5:(Options):0:74
+%REM
+	LS_ActiveDirectory_Lib
+	
+	@Author:
+	Artem Areshko (LiveScripts)
+	
+	@Version: 1.0.0
+	
+	@Description:
+		This library introducts interface to Microsoft Active Directory (MS AD) via LDAP.
+		It interacts with AD objects with IADs interface.
+%END REM
+
+Option Public
+Option Declare
+
+%REM
+	---=== History Log ===---
+	--- Version: X.X.X; DD.MM.YYYY; Name
+	1. 
+	
+%END REM
+
+'++LotusScript Development Environment:2:5:(Forward):0:1
+Declare Class ADConnector
+Declare Class ADObject
+Declare Class ADOU As ADObject
+Declare Class ADGroup As ADObject
+Declare Class ADUser As ADObject
+Declare Sub Initialize
+Declare Private Sub InitErrorStrings()
+Declare Private Function ReplaceSubString(Byval srcStr As String, srcSubStr As String, dstSubStr As String) As String
+Declare Private Sub RiseError(errCode As Integer, param As String)
+
+'++LotusScript Development Environment:2:5:(Declarations):0:10
+'=========================
+'===   P R I V A T E   ===
+'=== C O N S T A N T S ===
+'=========================
+'*** DESIGN KEY ***
+Private Const DESIGN = "LS_ActiveDirectory_Lib"
+'*** ADS ***
+Private Const ADS_SECURE_AUTHENTICATION = &H1
+Private Const ADSPATH = "adspath"
+Private Const SCOPE_SUBTREE = "subtree"
+Private Const ADS_SCOPE_SUBTREE = 2
+' SupportedCapability of an RODC.  Presence indictes DS is RO
+Private Const ACTIVE_DIRECTORY_PARTIAL_SECRETS  = "1.2.840.113556.1.4.1920"
+
+'=========================
+'===    P U B L I C    ===
+'=== C O N S T A N T S ===
+'=========================
+'*** ADS PROPERTY OPERATIONS (ADS_PROPERTY_OPERATION_ENUM)
+Public Const ADS_PROPERTY_CLEAR = 1
+Public Const ADS_PROPERTY_UPDATE = 2
+Public Const ADS_PROPERTY_APPEND = 3
+Public Const ADS_PROPERTY_DELETE = 4
+'*** OBJECTS TYPES ***
+Public Const AD_OBJECT_USER = "user"
+Public Const AD_OBJECT_GROUP = "group"
+Public Const AD_OBJECT_OU = "organizationalUnit"
+Public Const AD_OBJECT_COMPUTER = "computer"
+'*** AD SEARCH ATTRIBUTES ***
+Public Const AD_ATTRIBUTE_DISTINGUISHEDNAME = "distinguishedName"
+Public Const AD_ATTRIBUTE_SAMACCOUNTNAME = "sAMAccountName"
+Public Const AD_ATTRIBUTE_CN = "cn"
+Public Const AD_ATTRIBUTE_NAME = "name"
+Public Const AD_ATTRIBUTE_DESCRIP = "description"
+'*** Library Error Codes
+Public Const AD_ERR_PARAMEMPTY = 3500
+Public Const AD_ERR_PARAMNOTHING = 3501
+Public Const AD_ERR_PARAMNOTOBJECT = 3502
+Public Const AD_ERR_PARAMNOTARRAY = 3503
+Public Const AD_ERR_ADOBJECTNOTFOUND = 3504
+Public Const AD_ERR_NOPARENTOU = 3505
+
+'=========================
+'===   P R I V A T E   ===
+'=== V A R I A B L E S ===
+'=========================
+Private errStrings List As String
+
+
+'*** ADConnector ***
+%REM
+	@Description: Main Class
+%END REM
+Class ADConnector
+	
+	Private pr_domainName As String 'current connected domain name
+	Private pr_domainControllerName As String
+	Private targetHostName As String
+	
+	Private objDSO As Variant
+	Private objRootDSE As Variant
+	Private strRoot As Variant
+	Private conn As Variant
+	Private uName As Variant
+	Private uPwd As Variant
+	Private cmd As Variant
+	
+	'New
+	%REM
+		@Description: Initialize connection to Domain Controller, check if it is a ReadOnlyDomainController,
+		searches and connects to a RWDC 
+        
+        @Params:
+        domainName - Domain Name ("MyComp.int")
+        	Notice: you can connect to a specific controller: "controller-1.MyComp.int" 
+        
+        userName - account login you want to connect with. Should be entered with domain prefix ("MyComp\LotusAccount"). 
+		If you pass "" (empty string) - connects via current user account
+        	
+        userPwd - account password if userName is specified
+	%END REM
+	Public Sub New (domainName As String, userName As String, userPwd As String)
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.New"
+		
+		Call Me.InitializeVariables(Domainname, Username, Userpwd)
+		Call Me.Connect()
+		If Me.IsRODC() Then
+			Call Me.ReconnectToRWDC()
+		End If
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+	
+	'InitializeVariables
+	%REM
+		@Description: 
+	%END REM
+	Private Sub InitializeVariables(domainName As String, userName As String, userPwd As String)
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.InitializeVariables ()"
+		
+		Call Me.SetDomainName(Domainname)
+		Me.uName = userName
+		Me.uPwd = userPwd
+		
+		Set Me.objDSO = Nothing
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+	
+	'SetDomainName
+	%REM
+		@Description: 
+	%END REM
+	Private Sub SetDomainName(domainName As String)
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.SetDomainName ()"
+		
+		Dim tmpStr As String
+		
+		If domainName = "" Then Call RiseError(AD_ERR_PARAMEMPTY, "domainName")
+		Me.targetHostName = domainName
+		
+		tmpStr = Strright(domainName, ".")
+		If Instr(tmpStr, ".") > 0 Then
+			Me.pr_domainName = tmpStr
+		Else
+			Me.pr_domainName = domainName
+		End If
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+	
+	'IsRODC
+	%REM
+		@Description: 
+	%END REM
+	Private Function IsRODC() As Boolean
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.IsRODC ()"
+		
+		Dim supportedCapabilities
+		
+		supportedCapabilities = Me.objRootDSE.Get("supportedCapabilities")
+		Forall item In supportedCapabilities
+			If (item = ACTIVE_DIRECTORY_PARTIAL_SECRETS) Then
+				IsRODC = True
+				Exit Forall
+			End If
+		End Forall
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	'Connect
+	%REM
+		@Description: 
+	%END REM
+	Private Function Connect() As Boolean
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.Connect ()"
+		
+		'Connect to AD via ADO
+		Print "Connecting to: " & Me.targetHostName
+		
+		'Create objects, get root   
+		If Me.objDSO Is Nothing Then Set Me.objDSO = GetObject("LDAP:")
+		Set Me.objRootDSE = GetObject("LDAP://" & Me.targetHostName & "/RootDSE")
+		
+		'Get AD params
+		pr_DomainControllerName = Me.objRootDSE.Get("dnsHostName")
+		Me.strRoot = Me.objRootDSE.Get("DefaultNamingContext")
+		
+		'Create connection
+		Set Me.conn = CreateObject("ADODB.Connection")
+		Me.conn.Provider = "ADSDSOObject"
+		
+		
+		If Me.uName <> "" Then 'If userName and pwd was specified
+			Me.conn.Properties("User ID") = Me.uName
+			Me.conn.Properties("Password") = Me.uPwd			
+		End If
+		Me.conn.Open "Active Directory Provider"
+		
+		Set Me.cmd = CreateObject("ADODB.Command")
+		
+		Set Me.cmd.ActiveConnection = Me.Conn
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	'ReconnectToRWDC
+	%REM
+		@Description: 
+	%END REM
+	Private Sub ReconnectToRWDC()
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.ReconnectToRWDC ()"
+		
+		Me.targetHostName = Me.GetRWDCName()
+		Call Me.Connect()
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+	
+	'GetRWDCName
+	%REM
+		@Description: 
+	%END REM
+	Private Function GetRWDCName() As String
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.GetRWDCName ()"
+		
+		Dim strConfigurationNC As String
+		Dim query As String
+		Dim rs
+		Dim adObj As ADObject
+		
+		strConfigurationNC = Me.objRootDSE.Get("configurationNamingContext")
+		query = "SELECT ADsPath FROM 'LDAP://" & strConfigurationNC & "' WHERE objectClass='nTDSDSA'"
+		'Print query
+		Me.cmd.commandtext = query
+		Set rs = Me.cmd.Execute
+		
+		rs.MoveFirst
+		While Not rs.EOF
+			Set adObj = Me.GetADObject(AD_OBJECT_COMPUTER, Me.InitObj(rs.Fields("ADsPath").Value))
+			Call adObj.GetInfo("msDS-isRODC")
+			If Not (adObj.Get("msDS-isRODC")(0)) Then
+				Set adObj = adObj.GetParent()
+				GetRWDCName = adObj.Get("Name")(0) & "." & Me.DomainName
+				Goto endh
+			End If
+			
+			rs.MoveNext
+		Wend
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	%REM
+        Property Get DomainName
+        @Description: Current Domain Name
+	%END REM
+	Public Property Get DomainName As String
+		DomainName = pr_DomainName
+	End Property
+	
+	%REM
+        Property Get DomainControllerName
+        @Description: Current Domain Controller Name
+	%END REM
+	Public Property Get DomainControllerName As String
+		DomainControllerName = pr_domainControllerName
+	End Property
+	
+	%REM
+        Function InitObj
+        @Description: Init AD object by ADsPath.
+        @Return ad object (IADs) or rises error
+        @Param: objPath - CN path to ad object
+	%END REM
+	Public Function InitObj(objPath) As Variant
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.InitObj"
+		
+		Dim adObj As Variant
+		
+		If Ucase(Left(objPath,7)) <> "LDAP://" Then objPath = "LDAP://" & objPath
+
+		If Me.uName = "" Then
+			Set adObj = GetObject(objPath)
+		Else
+			Set adObj = Me.objDSO.OpenDSObject(objPath, _
+			Me.uName, _
+			Me.uPwd, _
+			ADS_SECURE_AUTHENTICATION)
+		End If
+		
+		If adObj Is Nothing Then Call RiseError(AD_ERR_ADOBJECTNOTFOUND, Me.DomainName & ", " & objPath)
+		
+		Set InitObj = adObj
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	%REM
+        Function FindObj
+        @Description: Search single object by params
+        @Return ADObject or Nothing is object not found 
+        @Params:
+        topObj - OU AD object to search in its subtree or Nothing to search from root
+        objType - Type of object to search
+        	AD_OBJECT_USER
+			AD_OBJECT_GROUP
+			AD_OBJECT_OU
+			...			
+        objName - search key        
+        SearchAtr - search attribute
+	%END REM
+	Public Function FindObj(topObj As ADOU, objType As String, objName As String, SearchAtr As String) As ADObject
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.FindObj"
+
+		Dim strobj As String, strFilter As String, strSearchAtr As String
+		Dim rs As Variant
+		
+		Set FindObj = Nothing
+		
+		Select Case objType
+			Case AD_OBJECT_USER : strobj = "(&(objectCategory=Person)(objectClass=User)"
+			Case AD_OBJECT_GROUP :strobj = "(&(objectCategory=Group)(objectClass=group)" 
+			Case AD_OBJECT_OU : strobj = "(&(objectClass=organizationalUnit)"
+			Case AD_OBJECT_COMPUTER : strobj = "(&(objectCategory=computer)"
+		End Select
+		
+		strFilter = strobj & "(" & SearchAtr & "=" & objName & "))"
+
+		If topObj Is Nothing Then
+			Me.cmd.commandtext = "<LDAP://" & Me.DomainName & "/" & Me.strRoot & _
+			">;" & strFilter & ";" & ADSPATH & ";" & SCOPE_SUBTREE
+		Else
+			Me.cmd.commandtext = "<" & topObj.ADsPath & _
+			">;" & strFilter & ";" & ADSPATH & ";" & SCOPE_SUBTREE
+		End If
+		
+		Me.cmd.Properties("Searchscope") = ADS_SCOPE_SUBTREE
+		Me.cmd.Properties("Cache Results") = True
+		
+		Set rs = Me.cmd.execute
+		
+		If rs.EOF Then Goto endh
+		
+		Set FindObj = Me.GetADObject(objType, Me.InitObj(rs.Fields(0).Value))
+		
+		Goto endh
+ErrorHandler:
+		Set rs = Nothing
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	%REM
+        Function CreateADObject
+        @Description: Creates but not saves new object
+        @Param:
+        objType - type of object
+        fullName - name of object
+        objContainer - OU than contains new object
+	%END REM
+	Public Function CreateADObject(objType As String, fullName As String, objContainer As ADOU) As ADObject
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.CreateADObject"
+		
+		Dim adObj As Variant
+		Dim adString As String		
+		Stop
+		Set CreateADObject = Nothing
+		
+		If objContainer Is Nothing Then Call RiseError(AD_ERR_PARAMNOTHING, "objContainer")
+		
+		adString = Me.ConvertToADAttribute(fullName)
+		
+		Select Case objType
+			Case AD_OBJECT_OU				
+				Set adObj = objContainer.GetObject().Create(objType, "OU=" & adString)
+				
+			Case AD_OBJECT_GROUP
+				Set adObj = objContainer.GetObject().Create(objType,"CN=" & adString)
+				adObj.Put "sAMAccountName", "" & adString & ""
+				
+			Case AD_OBJECT_USER
+				Set adObj = objContainer.GetObject().Create(objType, "cn=" & adString)
+				
+				adObj.Put "displayName", "" & adString & ""
+				adObj.Put "name", "" & adString & ""
+				
+		End Select
+		
+		Set CreateADObject = Me.GetADObject(objType, adObj)
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Goto endh
+endh:
+	End Function
+	
+	%REM
+        Function ConvertToADAttribute
+        @Description: Deletes spec symbols, cuts to 64 symbols
+	%END REM
+	Public Function ConvertToADAttribute(srcString As String) As String
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.ConvertToADAttribute ()"
+		
+		Dim tmpStr As String
+		
+		tmpStr = srcString
+		tmpStr = ReplaceSubString(tmpStr, {,}, "")
+		tmpStr = ReplaceSubString(tmpStr, {"},"")
+		tmpStr = ReplaceSubString(tmpStr, {«},"")
+		tmpStr = ReplaceSubString(tmpStr, {»},"")
+		If Len(tmpStr)>64 Then
+			tmpStr = Left(tmpStr,64)
+		End If
+		
+		ConvertToADAttribute = tmpStr
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	'GetADObject
+	%REM
+		@Description: 
+	%END REM
+	Public Function GetADObject(objType As String, adObj As Variant) As ADObject
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.GetADObject ()"
+		
+		Dim obj As ADObject
+		
+		Select Case objType
+			Case AD_OBJECT_USER
+				Set obj = New ADUser(Me, adObj)
+			Case AD_OBJECT_GROUP
+				Set obj = New ADGroup(Me, adObj)
+			Case AD_OBJECT_OU
+				Set obj = New ADOU(Me, adObj)
+			Case Else
+				Set obj = New ADObject(Me, adObj)
+
+		End Select
+		
+		Set GetADObject = obj
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	Public Sub Delete
+		On Error Goto ErrorHandler
+		Const FuncName = "ADConnector.Delete"
+		
+		Set Me.objDSO = Nothing
+		Set Me.objRootDSE = Nothing
+		Set Me.conn = Nothing
+		Set Me.cmd = Nothing
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+	
+End Class
+'*** ADObject ***
+%REM
+	@Description: 
+%END REM
+Class ADObject
+	
+	Private ad As ADConnector
+	Private adObj As Variant
+		
+	'New
+	%REM
+		@Description: 
+	%END REM
+	Public Sub New(ad As ADConnector, adObj As Variant)
+		On Error Goto ErrorHandler
+		Const FuncName = "ADObject.New ()"
+		
+		If ad Is Nothing Then Call RiseError(AD_ERR_PARAMNOTHING, "ad")
+		If Not Isobject(adObj) Then Call RiseError(AD_ERR_PARAMNOTOBJECT, "adObj")
+		If adObj Is Nothing Then Call RiseError(AD_ERR_PARAMNOTHING, "adObj")
+		
+		Set Me.ad = ad
+		Set Me.adObj = adObj
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+	
+	'GetObject
+	%REM
+		@Description: 
+	%END REM
+	Public Function GetObject() As Variant
+		Set GetObject = adObj
+	End Function
+	
+	'ADsPath
+	Public Property Get ADsPath As String
+		ADsPath = Me.adObj.ADsPath
+	End Property
+	
+	'Class
+	Public Property Get Class As String
+		Me.Class = Me.adObj.Class
+	End Property
+	
+	'GUID
+	Public Property Get GUID As String
+		GUID = Me.adObj.GUID
+	End Property
+	
+	'Name
+	Public Property Get Name As String
+		Me.Name = Me.adObj.Name
+	End Property
+	
+	'DistinguishedName
+	Public Property Get DistinguishedName As String
+		DistinguishedName = Me.adObj.distinguishedname
+	End Property
+	
+	'Parent
+	Public Property Get Parent As String
+		Parent = Me.adObj.Parent
+	End Property
+	
+	'Schema
+	Public Property Get Schema As String
+		Schema = Me.adObj.Schema
+	End Property
+	
+	'GetInfo
+	%REM
+		@Description: Loads the property values of this object from the underlying directory store.
+		@Params:
+		Set propertyNames = "" to load all values, or pass an array
+	%END REM
+	Public Sub GetInfo(propertyNames As Variant)
+		On Error Goto ErrorHandler
+		Const FuncName = "ADObject.GetInfo ()"
+		
+		If Isarray(propertyNames) Then
+			Me.adObj.GetInfoEx propertyNames, 0
+		Elseif propertyNames = "" Then
+			Call Me.adObj.GetInfo()
+		Else
+			Dim tmpArr(0 To 0)
+			tmpArr(0) = propertyNames
+			Me.adObj.GetInfoEx tmpArr, 0
+		End If
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+	
+	'Gete
+	%REM
+		@Description:
+		Get value for a property by name
+		@Param name of a property
+		@Return variant (array)
+	%END REM
+	Public Function Get(propertyName As String) As Variant
+		On Error Goto ErrorHandler
+		Const FuncName = "ADObject.Get ()"
+		
+		Me.Get = Me.adObj.GetEx(propertyName)
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	'Save
+	%REM
+		@Description: 
+	%END REM
+	Public Function Save() As Boolean
+		On Error Goto ErrorHandler
+		Const FuncName = "ADObject.Save ()"
+		
+		Me.adObj.SetInfo
+		Save = True
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	%REM
+        Sub Rename
+        Description: Comments for Sub
+	%END REM
+	Public Function Rename(newName As String) As Boolean
+		On Error Goto ErrorHandler
+		Const FuncName = "ADObject.Rename"
+		
+		Dim tmpNewName As String
+		
+		Dim parentOU As ADOU
+		Dim strObjType As String
+		
+		tmpNewName = ad.ConvertToADAttribute(newName)
+		
+		Set parentOU = Me.GetParent()
+		If Not parentOU.MoveHere(Me, tmpNewName) Then Goto endh
+		
+		Rename = True
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	'Put
+	%REM
+		@Description: 
+	%END REM
+	Public Sub Put(propertyName As String, value As Variant)
+		On Error Goto ErrorHandler
+		Const FuncName = "ADObject.Put ()"
+		
+		Me.adObj.Put propertyName, value
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+	
+	'ModifyAttribute
+	%REM
+		@Description: = PutEx
+	%END REM
+	Public Sub ModifyAttribute(modifType As Integer, propertyName As String, value As Variant)
+		On Error Goto ErrorHandler
+		Const FuncName = "ADObject.ModifyAttribute ()"
+		
+		If Isarray(value) Then
+			Me.adObj.PutEx modifType, propertyName, value
+		Else
+			Dim arr(0 To 0)
+			
+			arr(0) = value
+			Me.adObj.PutEx modifType, propertyName, arr
+		End If		
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+	
+	'GetParent
+	%REM
+		@Description: 
+	%END REM
+	Public Function GetParent() As ADOU
+		On Error Goto ErrorHandler
+		Const FuncName = "ADObject.GetParent ()"
+		
+		Set GetParent = Me.ad.GetADObject(AD_OBJECT_OU, Me.ad.InitObj(Me.Parent))
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	'ToString
+	%REM
+		@Description: 
+	%END REM
+	Public Function ToString() As String
+		ToString = Me.ADsPath
+	End Function
+
+End Class
+'*** ADOU ***
+%REM
+	@Description: 
+%END REM
+Class ADOU As ADObject
+	
+	'New
+	%REM
+		@Description: 
+	%END REM
+	Public Sub New(ad As ADConnector, adObj As Variant)
+	End Sub
+	
+	'MoveHere
+	%REM
+		@Description: 
+	%END REM
+	Public Function MoveHere(obj As ADObject, newName As String) As Boolean
+		On Error Goto ErrorHandler
+		Const FuncName = "ADOU.MoveHere ()"
+		
+		Dim tmpNewName As String
+		
+		If newName <> "" Then
+			tmpNewName = Strleft(obj.Name, "=") & "=" & ad.ConvertToADAttribute(newName)
+		Else
+			tmpNewName = obj.Name
+		End If
+		
+		Me.adObj.MoveHere obj.ADsPath, tmpNewName
+		
+		MoveHere = True
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	'Count
+	Public Property Get Count As Long
+		Count = Me.GetObject().Count
+	End Property
+
+End Class
+'*** ADGroup ***
+%REM
+	@Description: 
+%END REM
+Class ADGroup As ADObject
+	
+	'New
+	%REM
+		@Description: 
+	%END REM
+	Public Sub New(ad As ADConnector, adObj As Variant)
+	End Sub
+	
+	'AddMember
+	%REM
+		@Description: 
+	%END REM
+	Public Function AddMember(userObj As ADUser) As Boolean
+		On Error Goto ErrorHandler
+		Const FuncName = "ADGroup.AddMember ()"
+		
+		If Me.IsMember(userObj.ADsPath) Then
+			Goto quit
+		Else
+			Call Me.ModifyAttribute(ADS_PROPERTY_APPEND, "member", userObj.DistinguishedName)
+		End If
+		
+		If Not Me.Save() Goto endh
+		
+quit:
+		AddMember = True
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	%REM
+        Sub RemoveMember
+        Description:        
+	%END REM
+	Public Function RemoveMember (ADsPath As String) As Boolean
+		On Error Goto ErrorHandler
+		Const FuncName = "ADGroup.RemoveMember ()"
+		
+		If Me.IsMember(ADsPath) Then
+			Me.adObj.Remove ADsPath			
+			If Not Me.Save() Then Goto endh
+		End If
+		
+		RemoveMember = True
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	'IsMember
+	%REM
+		@Description: 
+	%END REM
+	Public Function IsMember(ADsPath As String) As Boolean
+		On Error Goto ErrorHandler
+		Const FuncName = "ADGroup.IsMember ()"
+		
+		IsMember = Me.GetObject().IsMember(ADsPath)
+		
+		Goto endh
+noADError:
+		Resume Next
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	%REM
+        Sub RemoveAllMembers
+        Description: 
+	%END REM
+	Public Function RemoveAllMembers () As Boolean
+		On Error Goto ErrorHandler
+		Const FuncName = "ADGroup.RemoveAllMembers"
+		
+		Dim adsMembers As Variant
+		
+		Set adsMembers = Me.adObj.Members()
+		Forall adsMember In adsMembers
+			Me.adObj.Remove adsMember.ADsPath
+		End Forall
+		
+		If Not Me.Save() Then Goto endh
+		
+		RemoveAllMembers = True
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	'GetMembers
+	%REM
+		@Description: 
+	%END REM
+	Public Function GetMembers() As Variant
+		On Error Goto ErrorHandler
+		Const FuncName = "ADGroup.GetMembers ()"
+		
+		On Error 213 Goto ReturnEmpty
+		GetMembers = Me.GetObject().GetEx("member")
+		
+		Goto endh
+ReturnEmpty:
+		Resume endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Function
+
+End Class
+'*** ADUser ***
+%REM
+	@Description: 
+%END REM
+Class ADUser As ADObject
+	
+	'New
+	%REM
+		@Description: 
+	%END REM
+	Public Sub New(ad As ADConnector, adObj As Variant)
+	End Sub
+	
+	'IsDisabled
+	Public Property Get IsDisabled As Boolean
+		On Error Goto ErrorHandler
+		Const FuncName = "ADUser.IsDisabled GET"
+		
+		IsDisabled = Me.adObj.AccountDisabled
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Property
+	
+	'IsDisabled
+	Public Property Set IsDisabled As Boolean
+		On Error Goto ErrorHandler
+		Const FuncName = "ADUser.IsDisabled SET"
+		
+		Me.adObj.AccountDisabled = IsDisabled
+		
+		Goto endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Property
+
+End Class
+'++LotusScript Development Environment:2:2:Initialize:1:10
+Sub Initialize
+	On Error Goto ErrorHandler
+	Const FuncName = "Initialize ()"
+	
+	Call InitErrorStrings()
+	
+	Goto endh
+ErrorHandler:
+	Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+End Sub
+
+'++LotusScript Development Environment:2:2:InitErrorStrings:5:8
+'InitErrorStrings
+%REM
+	@Description: 
+%END REM
+Private Sub InitErrorStrings()
+	On Error Goto ErrorHandler
+	Const FuncName = "InitErrorStrings ()"
+	
+	errStrings(AD_ERR_PARAMEMPTY) = "Param can't be empty: "
+	errStrings(AD_ERR_PARAMNOTHING) = "Param can't be empty: "
+	errStrings(AD_ERR_PARAMNOTOBJECT) = "Param must an object: "
+	errStrings(AD_ERR_PARAMNOTARRAY) = "Param must be array: "
+	errStrings(AD_ERR_ADOBJECTNOTFOUND) = "AD object not found by full path: "
+	
+	Goto endh
+ErrorHandler:
+	Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+End Sub
+
+'++LotusScript Development Environment:2:1:ReplaceSubString:5:8
+'ReplaceSubString
+%REM
+	@Description: 
+%END REM
+Private Function ReplaceSubString(Byval srcStr As String, srcSubStr As String, dstSubStr As String) As String
+	On Error Goto ErrorHandler
+	Const FuncName = "ReplaceSubString ()"
+	
+	Dim begin As Long
+	Dim found As Long
+	Dim strReplaceSource As String
+	begin = 1
+	
+	If Strcompare(srcSubStr, "") = 0 Or Strcompare(srcStr, "") = 0 Then Goto endh
+	Dim l As Long
+	l=Len(dstSubStr)
+	If l=0 Then l=1
+	
+	found = Instr(begin, srcStr, srcSubStr, 1) 
+	While (found > 0) 
+		begin = found + L
+		srcStr = Left$(srcStr, (found - 1)) & dstSubStr & Right$(srcStr, Len(srcStr) - (found + (Len(srcSubStr) - 1)))
+		found = Instr(begin, srcStr, srcSubStr, 1)
+	Wend
+	
+	ReplaceSubString = srcStr
+	
+	Goto endh
+ErrorHandler:
+	Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+End Function
+
+'++LotusScript Development Environment:2:2:RiseError:5:8
+'RiseError
+%REM
+	@Description: 
+%END REM
+Private Sub RiseError(errCode As Integer, param As String)
+	If param = "" Then
+		Error errCode, errStrings(errCode)
+	Else
+		Error errCode, errStrings(errCode) & param
+	End If	
+End Sub
