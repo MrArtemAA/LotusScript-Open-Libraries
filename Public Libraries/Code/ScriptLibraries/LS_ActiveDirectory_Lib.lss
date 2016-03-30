@@ -127,7 +127,7 @@ Class ADConnector
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -147,7 +147,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -173,7 +173,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -197,7 +197,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -237,7 +237,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -254,7 +254,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -292,7 +292,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -341,7 +341,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -397,7 +397,7 @@ endh:
 		Goto endh
 ErrorHandler:
 		Set rs = Nothing
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -442,7 +442,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 		Goto endh
 endh:
 	End Function
@@ -470,7 +470,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -500,7 +500,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -515,7 +515,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -546,7 +546,7 @@ Class ADObject
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -615,7 +615,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -634,7 +634,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -651,7 +651,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -677,7 +677,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -693,7 +693,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -716,7 +716,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -732,7 +732,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -780,7 +780,7 @@ Class ADOU As ADObject
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -824,7 +824,7 @@ quit:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -845,7 +845,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -863,7 +863,7 @@ endh:
 noADError:
 		Resume Next
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -888,7 +888,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
@@ -907,7 +907,7 @@ endh:
 ReturnEmpty:
 		Resume endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 
@@ -934,7 +934,7 @@ Class ADUser As ADObject
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Property
 	
@@ -947,7 +947,7 @@ endh:
 		
 		Goto endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Property
 
@@ -961,7 +961,7 @@ Sub Initialize
 	
 	Goto endh
 ErrorHandler:
-	Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+	Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 End Sub
 
@@ -982,7 +982,7 @@ Private Sub InitErrorStrings()
 	
 	Goto endh
 ErrorHandler:
-	Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+	Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 End Sub
 
@@ -1016,7 +1016,7 @@ Private Function ReplaceSubString(Byval srcStr As String, srcSubStr As String, d
 	
 	Goto endh
 ErrorHandler:
-	Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+	Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 End Function
 
@@ -1032,3 +1032,4 @@ Private Sub RiseError(errCode As Integer, param As String)
 		Error errCode, errStrings(errCode) & param
 	End If	
 End Sub
+
