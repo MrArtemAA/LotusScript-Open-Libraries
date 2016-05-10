@@ -3,13 +3,21 @@
 	LS_ActiveDirectory_Lib
 	
 	@Author:
-	Artem Areshko (LiveScripts)
+	Artem Areshko (Live Scripts)
+	http://live-scripts.blogspot.ru/
+	https://vk.com/livescriptslab
+	https://www.facebook.com/Live-Scripts-Lab-214495748709424/
 	
-	@Version: 1.0.0
+	@Licence
+		This is as freeware open source library. You may use for you own risk. Author does not
+		take responsibility for any effects of library usage. Source code may be modified for you
+		own needs.
+	
+	@Version: 2.0.0
 	
 	@Description:
-		This library introducts interface to Microsoft Active Directory (MS AD) via LDAP.
-		It interacts with AD objects with IADs interface.
+		Library introducts interface to Microsoft Active Directory (MS AD) via LDAP. For 
+		connection is uses ADODB.Connection OLE-object.
 %END REM
 
 Option Public
@@ -318,7 +326,7 @@ endh:
         @Return ad object (IADs) or rises error
         @Param: objPath - CN path to ad object
 	%END REM
-	Public Function InitObj(objPath) As Variant
+	Public Function InitObj(ByVal objPath As String) As Variant
 		On Error Goto ErrorHandler
 		Const FuncName = "ADConnector.InitObj"
 		
@@ -451,7 +459,7 @@ endh:
         Function ConvertToADAttribute
         @Description: Deletes spec symbols, cuts to 64 symbols
 	%END REM
-	Public Function ConvertToADAttribute(srcString As String) As String
+	Public Function ConvertToADAttribute(ByVal srcString As String) As String
 		On Error Goto ErrorHandler
 		Const FuncName = "ADConnector.ConvertToADAttribute ()"
 		
@@ -1032,4 +1040,5 @@ Private Sub RiseError(errCode As Integer, param As String)
 		Error errCode, errStrings(errCode) & param
 	End If	
 End Sub
+
 
