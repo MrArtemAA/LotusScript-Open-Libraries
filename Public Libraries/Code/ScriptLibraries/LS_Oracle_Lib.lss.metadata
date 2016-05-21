@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?><note class="filter" maintenanceversion="1.0" replicaid="43257F860056FF67" version="9.0" xmlns="http://www.lotus.com/dxl">
-<noteinfo noteid="196" sequence="13" unid="21A2E9B18391926A43257F8600584E90">
+<noteinfo noteid="196" sequence="39" unid="21A2E9B18391926A43257F8600584E90">
 <created><datetime>20160330T190432,80+03</datetime></created>
-<modified><datetime>20160510T122333,81+03</datetime></modified>
-<revised><datetime>20160510T122333,80+03</datetime></revised>
-<lastaccessed><datetime>20160510T122333,81+03</datetime></lastaccessed>
+<modified><datetime>20160521T195930,07+03</datetime></modified>
+<revised><datetime>20160521T195930,06+03</datetime></revised>
+<lastaccessed><datetime>20160521T195930,07+03</datetime></lastaccessed>
 <addedtofile><datetime>20160330T190432,81+03</datetime></addedtofile></noteinfo>
 <updatedby><name>CN=Artem A Areshko/O=LiveScripts/C=RU</name></updatedby>
 <wassignedby><name>CN=Artem A Areshko/O=LiveScripts/C=RU</name></wassignedby>
 <item name="$TITLE" sign="true"><text>LS_Oracle_Lib</text></item>
 <item name="$Flags"><text>s34Q</text></item>
 <item name="$PublicAccess" sign="true"><text>1</text></item>
+<item name="$DesignerVersion" sign="true"><text>8.5.3</text></item>
 
 
-<item name="$Comment" sign="true"><text>Version: 1.0.0</text></item>
-<item name="$DesignerVersion" sign="true"><text>8.5.3</text></item></note>
+<item name="$Comment"><text>Version: 2.0.0</text></item></note>

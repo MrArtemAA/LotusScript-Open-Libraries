@@ -4,11 +4,14 @@
 	
 	@Author:
 	Artem Areshko (Live Scripts Lab)
+	http://live-scripts.blogspot.ru/
+	https://vk.com/livescriptslab
+	https://www.facebook.com/Live-Scripts-Lab-214495748709424/
 	
 	@Version: 1.0.0
 	
 	@Description:
-		Library contains interface to Oracle Db. It uses OO4O to get more options from
+		Library contains interface to Oracle Db. It uses ADO to get more options from
 		Oracle than standart LC Classes.
 %END REM
 
@@ -17,8 +20,10 @@ Option Declare
 
 %REM
 	---=== History Log ===---
-	--- Version: X.X.X; DD.MM.YYYY; Name
-	1. 
+	--- Version: 2.0.0; 21.05.2016; Artem Areshko
+	1. Change connector from OO4O to ADO
+	
+	2. Added method OracleConnector.Delete
 	
 %END REM
 
@@ -26,7 +31,7 @@ Option Declare
 Declare Class OracleConnector
 Declare Class OracleDataSet
 Declare Private Sub InitErrorStrings()
-Declare Private Sub RiseError(errCode As Integer, param As String)
+Declare Private Sub RaiseError(errCode As Integer, param As String)
 
 '++LotusScript Development Environment:2:5:(Declarations):0:10
 '=========================
@@ -45,6 +50,8 @@ Public Const ORA_ERR_PARAMEMPTY = 3500
 Public Const ORA_ERR_PARAMNOTHING = 3501
 Public Const ORA_ERR_PARAMNOTOBJECT = 3502
 Public Const ORA_ERR_OLEOBJECTFAIL = 3503
+Public Const ORA_ERR_ABSTRACTMETHOD = 3504
+Public Const ORA_ERR_CONNECTIONFAILED = 3505
 
 '=========================
 '===   P R I V A T E   ===
@@ -52,18 +59,18 @@ Public Const ORA_ERR_OLEOBJECTFAIL = 3503
 '=========================
 Private errStrings List As String
 
+
 %REM
 	Class OracleConnector
 	Description: Main Class. Est. connection
 %END REM
 Class OracleConnector
-	
-	Private OraSession As Variant
-	Private OraDatabase As Variant
-	
 	Private dbName As String
 	Private login As String
 	Private pwd As String
+	
+	Private connection As Variant
+	Private cmd As Variant
 	
 	%REM
 		Sub New
@@ -73,102 +80,109 @@ Class OracleConnector
 		On Error GoTo ErrorHandler		
 		Const FuncName = "OracleConnector.New"
 		
-		Set Me.OraSession = Nothing
-		Set Me.OraDatabase = Nothing
+		Me.dbName = dbName
+		Me.login = userName
+		Me.pwd = userPwd
 		
-		Call Me.InitializeDatabase(Dbname, userName, userPwd)
-
+		If Not Me.InitializeConnection() Then Call RaiseError(ORA_ERR_CONNECTIONFAILED, dbName)
+		
 		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
-	'NeedInitializeDatabase
+	'InitializeConnection
 	%REM
-		@Description: 
+		Описание: 
 	%END REM
-	Private Function NeedInitializeDatabase(dbName As String, login As String, pwd As String) As Boolean
+	Private Function InitializeConnection() As Boolean
 		On Error GoTo ErrorHandler
-		Const FuncName = "IteratorOracle.NeedInitializeDatabase ()"
+		Const FuncName = "OracleConnector.InitializeConnection ()"
 		
-		NeedInitializeDatabase = True
+		Set connection = CreateObject("ADODB.Connection")
 		
-		If Me.OraSession Is Nothing Or Me.OraDatabase Is Nothing Then
-			GoTo endh
-		ElseIf Me.dbName <> dbName Or Me.login <> login Or Me.pwd <> pwd Then
-			GoTo endh			
-		End If
+		connection.Provider = "OraOLEDB.Oracle"
+		connection.Properties("Persist Security Info") = "True"
+		connection.Properties("Data Source") = dbName
+		connection.Properties("User ID") = login
+		connection.Properties("Password") = pwd
+		connection.Open
 		
-		NeedInitializeDatabase = False
+		Set cmd = CreateObject("ADODB.Command")
+		Set cmd.ActiveConnection = connection
+		
+		InitializeConnection = True
 		
 		GoTo endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
-	'InitializeDatabase
+	'GetDataSet
 	%REM
-		@Description: 
-	%END REM
-	Public Function InitializeDatabase(dbName As String, login As String, pwd As String) As Boolean
-		On Error GoTo ErrorHandler
-		Const FuncName = "OracleConnector.InitializeDatabase ()"
-		
-		If Not Me.NeedInitializeDatabase(Dbname, Login, Pwd) Then GoTo endh
-		
-		Set Me.OraSession = CreateObject("OracleInProcServer.XOraSession")
-		If Me.OraSession Is Nothing Then Call RiseError(ORA_ERR_OLEOBJECTFAIL,"OracleInProcServer.XOraSession")
-		
-		Set Me.OraDatabase = OraSession.OpenDatabase(dbName, login & "/" & pwd, CInt(0))
-		
-		Me.dbName = dbName
-		Me.login = login
-		Me.pwd = pwd
-		
-		InitializeDatabase = True
-		
-		GoTo endh
-ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
-endh:
-	End Function
-	
-	%REM
-		Function GetDataSet
-		Description: Comments for Function
+		Описание: 
 	%END REM
 	Public Function GetDataSet(sqlQuery As String) As OracleDataSet
 		On Error GoTo ErrorHandler
 		Const FuncName = "OracleConnector.GetDataSet ()"
 		
-		Dim oraDynaset As Variant
+		Dim dataSet As Variant
 		
-		Set oraDynaset = Me.OraDatabase.Createdynaset(sqlQuery, CInt(0))
-		Set GetDataSet = New OracleDataSet(Me, oraDynaset)
+		cmd.CommandText = sqlQuery
+		cmd.CommandType = 1
+		
+		Set dataSet = cmd.Execute
+		Set GetDataSet = New OracleDataSet(dataSet)
 		
 		GoTo endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
-endh:		
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
 	End Function
 	
 	'ExecuteSQL
 	%REM
-		@Description: 
+		Описание: 
 	%END REM
 	Public Function ExecuteSQL(sqlQuery As String) As Long
 		On Error GoTo ErrorHandler
 		Const FuncName = "OracleConnector.ExecuteSQL ()"
 		
-		ExecuteSQL = Me.OraDatabase.ExecuteSQL(sqlQuery)
+		Dim result As Long
+		
+		cmd.CommandText = sqlQuery
+		cmd.CommandType = 4
+		
+		Call cmd.Execute(result)
+		ExecuteSQL = result
 		
 		GoTo endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
 endh:
 	End Function
+	
+	'Delete
+	%REM
+		Описание: 
+	%END REM
+	Public Sub Delete
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleConnector.Delete ()"
+		
+		If Not connection Is Nothing Then
+			Call connection.close
+			Set cmd = Nothing
+			Set connection = Nothing
+		End If
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
 	
 End Class
 '*** OracleDataSet ***
@@ -177,23 +191,19 @@ End Class
 %END REM
 Class OracleDataSet
 	
-	Private oracle As OracleConnector
 	Private OraDynaset As Variant
 	
 	'New
 	%REM
 		@Description: 
 	%END REM
-	Public Sub New(oraDb As OracleConnector, oraDynaset As Variant)
+	Public Sub New(oraDynaset As Variant)
 		On Error GoTo ErrorHandler
 		Const FuncName = "OracleDataSet.New ()"
 		
-		If oraDb Is Nothing Then Call RiseError(ORA_ERR_PARAMNOTHING, "oraDb")
+		If Not IsObject(oraDynaset) Then Call RaiseError(ORA_ERR_PARAMNOTOBJECT, "oraDynaset")
+		If oraDynaset Is Nothing Then Call RaiseError(ORA_ERR_PARAMNOTHING, "oraDynaset")
 		
-		If Not IsObject(oraDynaset) Then Call RiseError(ORA_ERR_PARAMNOTOBJECT, "oraDynaset")
-		If oraDynaset Is Nothing Then Call RiseError(ORA_ERR_PARAMNOTHING, "oraDynaset")
-		
-		Set Me.oracle = oraDb
 		Set Me.OraDynaset = oraDynaset
 		
 		GoTo endh
@@ -242,7 +252,8 @@ endh:
 		On Error GoTo ErrorHandler
 		Const FuncName = "OracleDataSet.MoveTo ()"
 		
-		Me.OraDynaset.MoveTo n
+		Me.MoveFirst
+		Me.OraDynaset.Move n
 		
 		GoTo endh
 ErrorHandler:
@@ -287,7 +298,7 @@ endh:
 		On Error GoTo ErrorHandler
 		Const FuncName = "OracleDataSet.GetFieldValue ()"
 		
-		GetFieldValue = Me.OraDynaset.Fields(fieldName).Value
+		GetFieldValue = Me.OraDynaset.Fields.Item(fieldName).Value
 		
 		GoTo endh
 ErrorHandler:
@@ -312,7 +323,6 @@ endh:
 	End Function
 
 End Class
-
 '++LotusScript Development Environment:2:2:InitErrorStrings:5:8
 'InitErrorStrings
 %REM
@@ -326,6 +336,8 @@ Private Sub InitErrorStrings()
 	errStrings(ORA_ERR_PARAMNOTHING) = "Param can't be empty: "
 	errStrings(ORA_ERR_PARAMNOTOBJECT) = "Param must an object: "
 	errStrings(ORA_ERR_OLEOBJECTFAIL) = "Failed to create OLE object: "
+	errStrings(ORA_ERR_ABSTRACTMETHOD) = "Abstact method, need to override: "
+	errStrings(ORA_ERR_CONNECTIONFAILED) = "Failed to establish connection: "
 	
 	GoTo endh
 ErrorHandler:
@@ -333,15 +345,16 @@ ErrorHandler:
 endh:
 End Sub
 
-'++LotusScript Development Environment:2:2:RiseError:5:8
-'RiseError
+'++LotusScript Development Environment:2:2:RaiseError:5:8
+'RaiseError
 %REM
 	@Description: 
 %END REM
-Private Sub RiseError(errCode As Integer, param As String)
+Private Sub RaiseError(errCode As Integer, param As String)
 	If param = "" Then
 		Error errCode, errStrings(errCode)
 	Else
 		Error errCode, errStrings(errCode) & param
 	End If	
 End Sub
+

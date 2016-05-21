@@ -39,7 +39,7 @@ Declare Class ADUser As ADObject
 Declare Sub Initialize
 Declare Private Sub InitErrorStrings()
 Declare Private Function ReplaceSubString(Byval srcStr As String, srcSubStr As String, dstSubStr As String) As String
-Declare Private Sub RiseError(errCode As Integer, param As String)
+Declare Private Sub RaiseError(errCode As Integer, param As String)
 
 '++LotusScript Development Environment:2:5:(Declarations):0:10
 '=========================
@@ -169,7 +169,7 @@ endh:
 		
 		Dim tmpStr As String
 		
-		If domainName = "" Then Call RiseError(AD_ERR_PARAMEMPTY, "domainName")
+		If domainName = "" Then Call RaiseError(AD_ERR_PARAMEMPTY, "domainName")
 		Me.targetHostName = domainName
 		
 		tmpStr = Strright(domainName, ".")
@@ -343,7 +343,7 @@ endh:
 			ADS_SECURE_AUTHENTICATION)
 		End If
 		
-		If adObj Is Nothing Then Call RiseError(AD_ERR_ADOBJECTNOTFOUND, Me.DomainName & ", " & objPath)
+		If adObj Is Nothing Then Call RaiseError(AD_ERR_ADOBJECTNOTFOUND, Me.DomainName & ", " & objPath)
 		
 		Set InitObj = adObj
 		
@@ -426,7 +426,7 @@ endh:
 		Stop
 		Set CreateADObject = Nothing
 		
-		If objContainer Is Nothing Then Call RiseError(AD_ERR_PARAMNOTHING, "objContainer")
+		If objContainer Is Nothing Then Call RaiseError(AD_ERR_PARAMNOTHING, "objContainer")
 		
 		adString = Me.ConvertToADAttribute(fullName)
 		
@@ -545,9 +545,9 @@ Class ADObject
 		On Error Goto ErrorHandler
 		Const FuncName = "ADObject.New ()"
 		
-		If ad Is Nothing Then Call RiseError(AD_ERR_PARAMNOTHING, "ad")
-		If Not Isobject(adObj) Then Call RiseError(AD_ERR_PARAMNOTOBJECT, "adObj")
-		If adObj Is Nothing Then Call RiseError(AD_ERR_PARAMNOTHING, "adObj")
+		If ad Is Nothing Then Call RaiseError(AD_ERR_PARAMNOTHING, "ad")
+		If Not Isobject(adObj) Then Call RaiseError(AD_ERR_PARAMNOTOBJECT, "adObj")
+		If adObj Is Nothing Then Call RaiseError(AD_ERR_PARAMNOTHING, "adObj")
 		
 		Set Me.ad = ad
 		Set Me.adObj = adObj
@@ -1028,17 +1028,18 @@ ErrorHandler:
 endh:
 End Function
 
-'++LotusScript Development Environment:2:2:RiseError:5:8
-'RiseError
+'++LotusScript Development Environment:2:2:RaiseError:5:8
+'RaiseError
 %REM
 	@Description: 
 %END REM
-Private Sub RiseError(errCode As Integer, param As String)
+Private Sub RaiseError(errCode As Integer, param As String)
 	If param = "" Then
 		Error errCode, errStrings(errCode)
 	Else
 		Error errCode, errStrings(errCode) & param
 	End If	
 End Sub
+
 
 
