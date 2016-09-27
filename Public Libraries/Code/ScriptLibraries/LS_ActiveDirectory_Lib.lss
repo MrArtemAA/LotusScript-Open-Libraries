@@ -13,7 +13,7 @@
 		take responsibility for any effects of library usage. Source code may be modified for you
 		own needs.
 	
-	@Version: 2.0.0
+	@Version: 2.1.0
 	
 	@Description:
 		Library introducts interface to Microsoft Active Directory (MS AD) via LDAP. For 
@@ -25,21 +25,44 @@ Option Declare
 
 %REM
 	---=== History Log ===---
-	--- Version: X.X.X; DD.MM.YYYY; Name
-	1. 
+	--- Version: 2.1.0; 27.09.2016; Artem Areshko
+	1. Classes added
+		ADContainer
+		ADDomain
+	
+	2. Class modified ADOU
+		extends ADContainer
+		methods MoveHere() and Count GET moved to ADContainer
+		
+	3. Consts added
+		AD_OBJECT_DOMAIN
+		AD_ERR_PRARMNOTCORRECT
+		
+	4. Methods modified
+		ADConnector.CreateADObject()
+		ADConnector.FindObj()
+		if param in select case does not fit any case option - an
+		AD_ERR_PRARMNOTCORRECT error is thrown
+		
+	5. Method modified ADObject.Put()
+		If param is empty (""), nothing happens
+		
+	6. Method added ADConnecter.Domain GET
 	
 %END REM
 
 '++LotusScript Development Environment:2:5:(Forward):0:1
 Declare Class ADConnector
 Declare Class ADObject
-Declare Class ADOU As ADObject
 Declare Class ADGroup As ADObject
 Declare Class ADUser As ADObject
+Declare Class ADContainer As ADObject
+Declare Class ADOU As ADContainer
+Declare Class ADDomain As ADContainer
 Declare Sub Initialize
 Declare Private Sub InitErrorStrings()
-Declare Private Function ReplaceSubString(Byval srcStr As String, srcSubStr As String, dstSubStr As String) As String
-Declare Private Sub RiseError(errCode As Integer, param As String)
+Declare Private Sub RaiseError(errCode As Integer, param As String)
+Declare Private Function ReplaceSubString(ByVal srcStr As String, srcSubStr As String, dstSubStr As String) As String
 
 '++LotusScript Development Environment:2:5:(Declarations):0:10
 '=========================
@@ -70,6 +93,7 @@ Public Const AD_OBJECT_USER = "user"
 Public Const AD_OBJECT_GROUP = "group"
 Public Const AD_OBJECT_OU = "organizationalUnit"
 Public Const AD_OBJECT_COMPUTER = "computer"
+Public Const AD_OBJECT_DOMAIN = "domain"
 '*** AD SEARCH ATTRIBUTES ***
 Public Const AD_ATTRIBUTE_DISTINGUISHEDNAME = "distinguishedName"
 Public Const AD_ATTRIBUTE_SAMACCOUNTNAME = "sAMAccountName"
@@ -83,12 +107,15 @@ Public Const AD_ERR_PARAMNOTOBJECT = 3502
 Public Const AD_ERR_PARAMNOTARRAY = 3503
 Public Const AD_ERR_ADOBJECTNOTFOUND = 3504
 Public Const AD_ERR_NOPARENTOU = 3505
+Public Const AD_ERR_PRARMNOTCORRECT = 3506
 
 '=========================
 '===   P R I V A T E   ===
 '=== V A R I A B L E S ===
 '=========================
 Private errStrings List As String
+
+
 
 
 '*** ADConnector ***
@@ -100,6 +127,7 @@ Class ADConnector
 	Private pr_domainName As String 'current connected domain name
 	Private pr_domainControllerName As String
 	Private targetHostName As String
+	Private domain_ As ADDomain
 	
 	Private objDSO As Variant
 	Private objRootDSE As Variant
@@ -124,7 +152,7 @@ Class ADConnector
         userPwd - account password if userName is specified
 	%END REM
 	Public Sub New (domainName As String, userName As String, userPwd As String)
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.New"
 		
 		Call Me.InitializeVariables(Domainname, Username, Userpwd)
@@ -133,7 +161,7 @@ Class ADConnector
 			Call Me.ReconnectToRWDC()
 		End If
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -144,7 +172,7 @@ endh:
 		@Description: 
 	%END REM
 	Private Sub InitializeVariables(domainName As String, userName As String, userPwd As String)
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.InitializeVariables ()"
 		
 		Call Me.SetDomainName(Domainname)
@@ -153,7 +181,7 @@ endh:
 		
 		Set Me.objDSO = Nothing
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -164,22 +192,22 @@ endh:
 		@Description: 
 	%END REM
 	Private Sub SetDomainName(domainName As String)
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.SetDomainName ()"
 		
 		Dim tmpStr As String
 		
-		If domainName = "" Then Call RiseError(AD_ERR_PARAMEMPTY, "domainName")
+		If domainName = "" Then Call RaiseError(AD_ERR_PARAMEMPTY, "domainName")
 		Me.targetHostName = domainName
 		
-		tmpStr = Strright(domainName, ".")
-		If Instr(tmpStr, ".") > 0 Then
+		tmpStr = StrRight(domainName, ".")
+		If InStr(tmpStr, ".") > 0 Then
 			Me.pr_domainName = tmpStr
 		Else
 			Me.pr_domainName = domainName
 		End If
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -190,20 +218,20 @@ endh:
 		@Description: 
 	%END REM
 	Private Function IsRODC() As Boolean
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.IsRODC ()"
 		
 		Dim supportedCapabilities
 		
 		supportedCapabilities = Me.objRootDSE.Get("supportedCapabilities")
-		Forall item In supportedCapabilities
+		ForAll item In supportedCapabilities
 			If (item = ACTIVE_DIRECTORY_PARTIAL_SECRETS) Then
 				IsRODC = True
-				Exit Forall
+				Exit ForAll
 			End If
-		End Forall
+		End ForAll
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -214,7 +242,7 @@ endh:
 		@Description: 
 	%END REM
 	Private Function Connect() As Boolean
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.Connect ()"
 		
 		'Connect to AD via ADO
@@ -243,7 +271,7 @@ endh:
 		
 		Set Me.cmd.ActiveConnection = Me.Conn
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -254,13 +282,13 @@ endh:
 		@Description: 
 	%END REM
 	Private Sub ReconnectToRWDC()
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.ReconnectToRWDC ()"
 		
 		Me.targetHostName = Me.GetRWDCName()
 		Call Me.Connect()
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -271,7 +299,7 @@ endh:
 		@Description: 
 	%END REM
 	Private Function GetRWDCName() As String
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.GetRWDCName ()"
 		
 		Dim strConfigurationNC As String
@@ -292,13 +320,13 @@ endh:
 			If Not (adObj.Get("msDS-isRODC")(0)) Then
 				Set adObj = adObj.GetParent()
 				GetRWDCName = adObj.Get("Name")(0) & "." & Me.DomainName
-				Goto endh
+				GoTo endh
 			End If
 			
 			rs.MoveNext
 		Wend
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -327,12 +355,12 @@ endh:
         @Param: objPath - CN path to ad object
 	%END REM
 	Public Function InitObj(ByVal objPath As String) As Variant
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.InitObj"
 		
 		Dim adObj As Variant
 		
-		If Ucase(Left(objPath,7)) <> "LDAP://" Then objPath = "LDAP://" & objPath
+		If UCase(Left(objPath,7)) <> "LDAP://" Then objPath = "LDAP://" & objPath
 
 		If Me.uName = "" Then
 			Set adObj = GetObject(objPath)
@@ -343,11 +371,11 @@ endh:
 			ADS_SECURE_AUTHENTICATION)
 		End If
 		
-		If adObj Is Nothing Then Call RiseError(AD_ERR_ADOBJECTNOTFOUND, Me.DomainName & ", " & objPath)
+		If adObj Is Nothing Then Call RaiseError(AD_ERR_ADOBJECTNOTFOUND, Me.DomainName & ", " & objPath)
 		
 		Set InitObj = adObj
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -368,8 +396,8 @@ endh:
         SearchAtr - search attribute
 	%END REM
 	Public Function FindObj(topObj As ADOU, objType As String, objName As String, SearchAtr As String) As ADObject
-		On Error Goto ErrorHandler
-		Const FuncName = "ADConnector.FindObj"
+		On Error GoTo ErrorHandler
+		Const FuncName = "ADConnector.FindObj ()"
 
 		Dim strobj As String, strFilter As String, strSearchAtr As String
 		Dim rs As Variant
@@ -381,6 +409,8 @@ endh:
 			Case AD_OBJECT_GROUP :strobj = "(&(objectCategory=Group)(objectClass=group)" 
 			Case AD_OBJECT_OU : strobj = "(&(objectClass=organizationalUnit)"
 			Case AD_OBJECT_COMPUTER : strobj = "(&(objectCategory=computer)"
+			Case Else
+				Call RaiseError(AD_ERR_PRARMNOTCORRECT, "objType = " & objType)
 		End Select
 		
 		strFilter = strobj & "(" & SearchAtr & "=" & objName & "))"
@@ -398,11 +428,11 @@ endh:
 		
 		Set rs = Me.cmd.execute
 		
-		If rs.EOF Then Goto endh
+		If rs.EOF Then GoTo endh
 		
 		Set FindObj = Me.GetADObject(objType, Me.InitObj(rs.Fields(0).Value))
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Set rs = Nothing
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
@@ -417,16 +447,16 @@ endh:
         fullName - name of object
         objContainer - OU than contains new object
 	%END REM
-	Public Function CreateADObject(objType As String, fullName As String, objContainer As ADOU) As ADObject
-		On Error Goto ErrorHandler
+	Public Function CreateADObject(objType As String, fullName As String, objContainer As ADContainer) As ADObject
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.CreateADObject"
 		
 		Dim adObj As Variant
 		Dim adString As String		
-		Stop
+		
 		Set CreateADObject = Nothing
 		
-		If objContainer Is Nothing Then Call RiseError(AD_ERR_PARAMNOTHING, "objContainer")
+		If objContainer Is Nothing Then Call RaiseError(AD_ERR_PARAMNOTHING, "objContainer")
 		
 		adString = Me.ConvertToADAttribute(fullName)
 		
@@ -443,15 +473,18 @@ endh:
 				
 				adObj.Put "displayName", "" & adString & ""
 				adObj.Put "name", "" & adString & ""
+			
+			Case Else
+				Call RaiseError(AD_ERR_PRARMNOTCORRECT, "objType = " & objType)
 				
 		End Select
 		
 		Set CreateADObject = Me.GetADObject(objType, adObj)
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
-		Goto endh
+		GoTo endh
 endh:
 	End Function
 	
@@ -460,7 +493,7 @@ endh:
         @Description: Deletes spec symbols, cuts to 64 symbols
 	%END REM
 	Public Function ConvertToADAttribute(ByVal srcString As String) As String
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.ConvertToADAttribute ()"
 		
 		Dim tmpStr As String
@@ -476,7 +509,7 @@ endh:
 		
 		ConvertToADAttribute = tmpStr
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -487,7 +520,7 @@ endh:
 		@Description: 
 	%END REM
 	Public Function GetADObject(objType As String, adObj As Variant) As ADObject
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.GetADObject ()"
 		
 		Dim obj As ADObject
@@ -499,21 +532,22 @@ endh:
 				Set obj = New ADGroup(Me, adObj)
 			Case AD_OBJECT_OU
 				Set obj = New ADOU(Me, adObj)
+			Case AD_OBJECT_DOMAIN
+				Set obj = New ADDomain(Me, adObj)
 			Case Else
 				Set obj = New ADObject(Me, adObj)
-
 		End Select
 		
 		Set GetADObject = obj
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Function
 	
 	Public Sub Delete
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.Delete"
 		
 		Set Me.objDSO = Nothing
@@ -521,11 +555,31 @@ endh:
 		Set Me.conn = Nothing
 		Set Me.cmd = Nothing
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
+	
+	%REM
+		Property Get Domain
+		Description: Comments for Property Get
+	%END REM
+	Public Property Get Domain As ADDomain
+		On Error GoTo ErrorHandler
+		Const FuncName = "ADConnector.Domain GET"
+		
+		If domain_ Is Nothing Then
+			Set domain_ = Me.GetADObject(AD_OBJECT_DOMAIN, Me.InitObj(Me.DomainName))
+		End If
+		
+		Set Domain = domain_
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Property
 	
 End Class
 '*** ADObject ***
@@ -542,17 +596,17 @@ Class ADObject
 		@Description: 
 	%END REM
 	Public Sub New(ad As ADConnector, adObj As Variant)
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADObject.New ()"
 		
-		If ad Is Nothing Then Call RiseError(AD_ERR_PARAMNOTHING, "ad")
-		If Not Isobject(adObj) Then Call RiseError(AD_ERR_PARAMNOTOBJECT, "adObj")
-		If adObj Is Nothing Then Call RiseError(AD_ERR_PARAMNOTHING, "adObj")
+		If ad Is Nothing Then Call RaiseError(AD_ERR_PARAMNOTHING, "ad")
+		If Not IsObject(adObj) Then Call RaiseError(AD_ERR_PARAMNOTOBJECT, "adObj")
+		If adObj Is Nothing Then Call RaiseError(AD_ERR_PARAMNOTHING, "adObj")
 		
 		Set Me.ad = ad
 		Set Me.adObj = adObj
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -608,12 +662,12 @@ endh:
 		Set propertyNames = "" to load all values, or pass an array
 	%END REM
 	Public Sub GetInfo(propertyNames As Variant)
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADObject.GetInfo ()"
 		
-		If Isarray(propertyNames) Then
+		If IsArray(propertyNames) Then
 			Me.adObj.GetInfoEx propertyNames, 0
-		Elseif propertyNames = "" Then
+		ElseIf propertyNames = "" Then
 			Call Me.adObj.GetInfo()
 		Else
 			Dim tmpArr(0 To 0)
@@ -621,7 +675,7 @@ endh:
 			Me.adObj.GetInfoEx tmpArr, 0
 		End If
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -635,12 +689,12 @@ endh:
 		@Return variant (array)
 	%END REM
 	Public Function Get(propertyName As String) As Variant
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADObject.Get ()"
 		
 		Me.Get = Me.adObj.GetEx(propertyName)
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -651,13 +705,13 @@ endh:
 		@Description: 
 	%END REM
 	Public Function Save() As Boolean
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADObject.Save ()"
 		
 		Me.adObj.SetInfo
 		Save = True
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -668,7 +722,7 @@ endh:
         Description: Comments for Sub
 	%END REM
 	Public Function Rename(newName As String) As Boolean
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADObject.Rename"
 		
 		Dim tmpNewName As String
@@ -679,11 +733,11 @@ endh:
 		tmpNewName = ad.ConvertToADAttribute(newName)
 		
 		Set parentOU = Me.GetParent()
-		If Not parentOU.MoveHere(Me, tmpNewName) Then Goto endh
+		If Not parentOU.MoveHere(Me, tmpNewName) Then GoTo endh
 		
 		Rename = True
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -694,12 +748,13 @@ endh:
 		@Description: 
 	%END REM
 	Public Sub Put(propertyName As String, value As Variant)
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADObject.Put ()"
 		
+		If CStr(value) = "" Then GoTo endh
 		Me.adObj.Put propertyName, value
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -710,10 +765,10 @@ endh:
 		@Description: = PutEx
 	%END REM
 	Public Sub ModifyAttribute(modifType As Integer, propertyName As String, value As Variant)
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADObject.ModifyAttribute ()"
 		
-		If Isarray(value) Then
+		If IsArray(value) Then
 			Me.adObj.PutEx modifType, propertyName, value
 		Else
 			Dim arr(0 To 0)
@@ -722,7 +777,7 @@ endh:
 			Me.adObj.PutEx modifType, propertyName, arr
 		End If		
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -733,12 +788,12 @@ endh:
 		@Description: 
 	%END REM
 	Public Function GetParent() As ADOU
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADObject.GetParent ()"
 		
 		Set GetParent = Me.ad.GetADObject(AD_OBJECT_OU, Me.ad.InitObj(Me.Parent))
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -753,62 +808,24 @@ endh:
 	End Function
 
 End Class
-'*** ADOU ***
-%REM
-	@Description: 
-%END REM
-Class ADOU As ADObject
-	
-	'New
-	%REM
-		@Description: 
-	%END REM
-	Public Sub New(ad As ADConnector, adObj As Variant)
-	End Sub
-	
-	'MoveHere
-	%REM
-		@Description: 
-	%END REM
-	Public Function MoveHere(obj As ADObject, newName As String) As Boolean
-		On Error Goto ErrorHandler
-		Const FuncName = "ADOU.MoveHere ()"
-		
-		Dim tmpNewName As String
-		
-		If newName <> "" Then
-			tmpNewName = Strleft(obj.Name, "=") & "=" & ad.ConvertToADAttribute(newName)
-		Else
-			tmpNewName = obj.Name
-		End If
-		
-		Me.adObj.MoveHere obj.ADsPath, tmpNewName
-		
-		MoveHere = True
-		
-		Goto endh
-ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
-endh:
-	End Function
-	
-	'Count
-	Public Property Get Count As Long
-		Count = Me.GetObject().Count
-	End Property
-
-End Class
 '*** ADGroup ***
 %REM
 	@Description: 
 %END REM
 Class ADGroup As ADObject
 	
-	'New
 	%REM
-		@Description: 
+		Sub New
+		Description: Comments for Sub
 	%END REM
 	Public Sub New(ad As ADConnector, adObj As Variant)
+		On Error GoTo ErrorHandler
+		Const FuncName = "ADGroup.New ()"
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
 	End Sub
 	
 	'AddMember
@@ -816,21 +833,21 @@ Class ADGroup As ADObject
 		@Description: 
 	%END REM
 	Public Function AddMember(userObj As ADUser) As Boolean
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADGroup.AddMember ()"
 		
 		If Me.IsMember(userObj.ADsPath) Then
-			Goto quit
+			GoTo quit
 		Else
 			Call Me.ModifyAttribute(ADS_PROPERTY_APPEND, "member", userObj.DistinguishedName)
 		End If
 		
-		If Not Me.Save() Goto endh
+		If Not Me.Save() GoTo endh
 		
 quit:
 		AddMember = True
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -841,17 +858,17 @@ endh:
         Description:        
 	%END REM
 	Public Function RemoveMember (ADsPath As String) As Boolean
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADGroup.RemoveMember ()"
 		
 		If Me.IsMember(ADsPath) Then
 			Me.adObj.Remove ADsPath			
-			If Not Me.Save() Then Goto endh
+			If Not Me.Save() Then GoTo endh
 		End If
 		
 		RemoveMember = True
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -862,12 +879,12 @@ endh:
 		@Description: 
 	%END REM
 	Public Function IsMember(ADsPath As String) As Boolean
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADGroup.IsMember ()"
 		
 		IsMember = Me.GetObject().IsMember(ADsPath)
 		
-		Goto endh
+		GoTo endh
 noADError:
 		Resume Next
 ErrorHandler:
@@ -880,21 +897,21 @@ endh:
         Description: 
 	%END REM
 	Public Function RemoveAllMembers () As Boolean
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADGroup.RemoveAllMembers"
 		
 		Dim adsMembers As Variant
 		
 		Set adsMembers = Me.adObj.Members()
-		Forall adsMember In adsMembers
+		ForAll adsMember In adsMembers
 			Me.adObj.Remove adsMember.ADsPath
-		End Forall
+		End ForAll
 		
-		If Not Me.Save() Then Goto endh
+		If Not Me.Save() Then GoTo endh
 		
 		RemoveAllMembers = True
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -905,13 +922,13 @@ endh:
 		@Description: 
 	%END REM
 	Public Function GetMembers() As Variant
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADGroup.GetMembers ()"
 		
-		On Error 213 Goto ReturnEmpty
+		On Error 213 GoTo ReturnEmpty
 		GetMembers = Me.GetObject().GetEx("member")
 		
-		Goto endh
+		GoTo endh
 ReturnEmpty:
 		Resume endh
 ErrorHandler:
@@ -926,21 +943,28 @@ End Class
 %END REM
 Class ADUser As ADObject
 	
-	'New
 	%REM
-		@Description: 
+		Sub New
+		Description: Comments for Sub
 	%END REM
 	Public Sub New(ad As ADConnector, adObj As Variant)
+		On Error GoTo ErrorHandler
+		Const FuncName = "ADUser.New ()"
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
 	End Sub
 	
 	'IsDisabled
 	Public Property Get IsDisabled As Boolean
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADUser.IsDisabled GET"
 		
 		IsDisabled = Me.adObj.AccountDisabled
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -948,26 +972,121 @@ endh:
 	
 	'IsDisabled
 	Public Property Set IsDisabled As Boolean
-		On Error Goto ErrorHandler
+		On Error GoTo ErrorHandler
 		Const FuncName = "ADUser.IsDisabled SET"
 		
 		Me.adObj.AccountDisabled = IsDisabled
 		
-		Goto endh
+		GoTo endh
 ErrorHandler:
 		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Property
 
 End Class
+%REM
+	Class ADContainer
+	Description: Comments for Class
+%END REM
+Class ADContainer As ADObject
+	
+	%REM
+		Sub New
+		Description: Comments for Sub
+	%END REM
+	Public Sub New(ad As ADConnector, adObj As Variant)
+		On Error GoTo ErrorHandler
+		Const FuncName = "ADContainer.New ()"
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+	
+	'MoveHere
+	%REM
+		@Description: 
+	%END REM
+	Public Function MoveHere(obj As ADObject, newName As String) As Boolean
+		On Error GoTo ErrorHandler
+		Const FuncName = "ADOU.MoveHere ()"
+		
+		Dim tmpNewName As String
+		
+		If newName <> "" Then
+			tmpNewName = StrLeft(obj.Name, "=") & "=" & ad.ConvertToADAttribute(newName)
+		Else
+			tmpNewName = obj.Name
+		End If
+		
+		Me.adObj.MoveHere obj.ADsPath, tmpNewName
+		
+		MoveHere = True
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
+endh:
+	End Function
+	
+	'Count
+	Public Property Get Count As Long
+		Count = Me.GetObject().Count
+	End Property
+
+End Class
+'*** ADOU ***
+%REM
+	@Description: 
+%END REM
+Class ADOU As ADContainer
+	
+	%REM
+		Sub New
+		Description: Comments for Sub
+	%END REM
+	Public Sub New(ad As ADConnector, adObj As Variant)
+		On Error GoTo ErrorHandler
+		Const FuncName = "ADOU.New ()"
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+	
+End Class
+%REM
+	Class ADDomain
+	Description: Comments for Class
+%END REM
+Class ADDomain As ADContainer
+	
+	%REM
+		Sub New
+		Description: Comments for Sub
+	%END REM
+	Public Sub New(ad As ADConnector, adObj As Variant)
+		On Error GoTo ErrorHandler
+		Const FuncName = "ADDomain.New ()"
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+endh:
+	End Sub
+
+End Class
+
 '++LotusScript Development Environment:2:2:Initialize:1:10
 Sub Initialize
-	On Error Goto ErrorHandler
+	On Error GoTo ErrorHandler
 	Const FuncName = "Initialize ()"
 	
 	Call InitErrorStrings()
 	
-	Goto endh
+	GoTo endh
 ErrorHandler:
 	Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
@@ -979,7 +1098,7 @@ End Sub
 	@Description: 
 %END REM
 Private Sub InitErrorStrings()
-	On Error Goto ErrorHandler
+	On Error GoTo ErrorHandler
 	Const FuncName = "InitErrorStrings ()"
 	
 	errStrings(AD_ERR_PARAMEMPTY) = "Param can't be empty: "
@@ -987,53 +1106,20 @@ Private Sub InitErrorStrings()
 	errStrings(AD_ERR_PARAMNOTOBJECT) = "Param must an object: "
 	errStrings(AD_ERR_PARAMNOTARRAY) = "Param must be array: "
 	errStrings(AD_ERR_ADOBJECTNOTFOUND) = "AD object not found by full path: "
+	errStrings(AD_ERR_PRARMNOTCORRECT) = "Param not supported or correct: "
 	
-	Goto endh
+	GoTo endh
 ErrorHandler:
 	Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 End Sub
 
-'++LotusScript Development Environment:2:1:ReplaceSubString:5:8
-'ReplaceSubString
+'++LotusScript Development Environment:2:2:RaiseError:5:8
+'RaiseError
 %REM
 	@Description: 
 %END REM
-Private Function ReplaceSubString(Byval srcStr As String, srcSubStr As String, dstSubStr As String) As String
-	On Error Goto ErrorHandler
-	Const FuncName = "ReplaceSubString ()"
-	
-	Dim begin As Long
-	Dim found As Long
-	Dim strReplaceSource As String
-	begin = 1
-	
-	If Strcompare(srcSubStr, "") = 0 Or Strcompare(srcStr, "") = 0 Then Goto endh
-	Dim l As Long
-	l=Len(dstSubStr)
-	If l=0 Then l=1
-	
-	found = Instr(begin, srcStr, srcSubStr, 1) 
-	While (found > 0) 
-		begin = found + L
-		srcStr = Left$(srcStr, (found - 1)) & dstSubStr & Right$(srcStr, Len(srcStr) - (found + (Len(srcSubStr) - 1)))
-		found = Instr(begin, srcStr, srcSubStr, 1)
-	Wend
-	
-	ReplaceSubString = srcStr
-	
-	Goto endh
-ErrorHandler:
-	Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
-endh:
-End Function
-
-'++LotusScript Development Environment:2:2:RiseError:5:8
-'RiseError
-%REM
-	@Description: 
-%END REM
-Private Sub RiseError(errCode As Integer, param As String)
+Private Sub RaiseError(errCode As Integer, param As String)
 	If param = "" Then
 		Error errCode, errStrings(errCode)
 	Else
@@ -1041,4 +1127,40 @@ Private Sub RiseError(errCode As Integer, param As String)
 	End If	
 End Sub
 
+'++LotusScript Development Environment:2:1:ReplaceSubString:9:8
 
+
+
+
+'ReplaceSubString
+%REM
+	@Description: 
+%END REM
+Private Function ReplaceSubString(ByVal srcStr As String, srcSubStr As String, dstSubStr As String) As String
+	On Error GoTo ErrorHandler
+	Const FuncName = "ReplaceSubString ()"
+	
+	Dim begin As Long
+	Dim found As Long
+	Dim strReplaceSource As String
+	begin = 1
+	
+	If StrCompare(srcSubStr, "") = 0 Or StrCompare(srcStr, "") = 0 Then GoTo endh
+	Dim l As Long
+	l=Len(dstSubStr)
+	If l=0 Then l=1
+	
+	found = InStr(begin, srcStr, srcSubStr, 1) 
+	While (found > 0) 
+		begin = found + L
+		srcStr = Left$(srcStr, (found - 1)) & dstSubStr & Right$(srcStr, Len(srcStr) - (found + (Len(srcSubStr) - 1)))
+		found = InStr(begin, srcStr, srcSubStr, 1)
+	Wend
+	
+	ReplaceSubString = srcStr
+	
+	GoTo endh
+ErrorHandler:
+	Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
+endh:
+End Function
