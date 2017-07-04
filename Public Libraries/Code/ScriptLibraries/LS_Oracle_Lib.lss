@@ -2,10 +2,17 @@
 %REM
 	LS_Oracle_Lib
 	
-	@Author:
-	Artem Areshko (Live Scripts Lab)
+	Copyright © 2016-2017. All rights reserved.
+	@License: MIT (http://opensource.org/licenses/MIT)
 	
-	@Version: 1.0.0
+	@Author:
+	Artem Areshko (Live Scripts)
+	Contacts:
+	http://live-scripts.blogspot.ru/
+	https://vk.com/livescriptslab
+	https://www.facebook.com/Live-Scripts-Lab-214495748709424/
+	
+	@Version: 2.0.0
 	
 	@Description:
 		Library contains interface to Oracle Db. It uses OO4O to get more options from
@@ -312,7 +319,6 @@ endh:
 	End Function
 
 End Class
-
 '++LotusScript Development Environment:2:2:InitErrorStrings:5:8
 'InitErrorStrings
 %REM

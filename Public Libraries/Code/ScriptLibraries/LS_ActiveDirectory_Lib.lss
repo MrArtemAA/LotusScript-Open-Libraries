@@ -2,16 +2,15 @@
 %REM
 	LS_ActiveDirectory_Lib
 	
+	Copyright © 2016-2017. All rights reserved.
+	@License: MIT (http://opensource.org/licenses/MIT)
+	
 	@Author:
 	Artem Areshko (Live Scripts)
+	Contacts:
 	http://live-scripts.blogspot.ru/
 	https://vk.com/livescriptslab
 	https://www.facebook.com/Live-Scripts-Lab-214495748709424/
-	
-	@Licence
-		This is as freeware open source library. You may use for you own risk. Author does not
-		take responsibility for any effects of library usage. Source code may be modified for you
-		own needs.
 	
 	@Version: 2.1.0
 	
@@ -1078,7 +1077,6 @@ endh:
 	End Sub
 
 End Class
-
 '++LotusScript Development Environment:2:2:Initialize:1:10
 Sub Initialize
 	On Error GoTo ErrorHandler
