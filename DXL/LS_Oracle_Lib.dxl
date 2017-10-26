@@ -1,0 +1,364 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE database SYSTEM 'xmlschemas/domino_9_0_1.dtd'>
+<database xmlns='http://www.lotus.com/dxl' version='9.0' maintenanceversion='1.0'
+ replicaid='43257F860056FF67' path='CN=LS1/O=LiveScripts/C=RU!!SrcControl\LS_PublicLibs.nsf'
+ title='LS Public Libraries'>
+<databaseinfo dbid='43257F860056FF67' odsversion='43' diskspace='774144' percentused='61.9047619047619'
+ numberofdocuments='0'><datamodified><datetime>20160523T020048,58+03</datetime></datamodified><designmodified
+><datetime>20170704T180636,31+03</datetime></designmodified></databaseinfo>
+<scriptlibrary name='LS_Oracle_Lib' hide='v3 v4strict' designerversion='8.5.3'
+ comment='Version: 2.0.0'>
+<noteinfo noteid='196' unid='21A2E9B18391926A43257F8600584E90' sequence='45'>
+<created><datetime>20160330T190432,80+03</datetime></created>
+<modified><datetime>20170704T180636,31+03</datetime></modified>
+<revised><datetime>20170704T180636,30+03</datetime></revised>
+<lastaccessed><datetime>20170704T180636,31+03</datetime></lastaccessed>
+<addedtofile><datetime>20160330T190432,81+03</datetime></addedtofile></noteinfo>
+<updatedby><name>CN=Artem A Areshko/O=LiveScripts/C=RU</name></updatedby>
+<wassignedby><name>CN=Artem A Areshko/O=LiveScripts/C=RU</name></wassignedby><code
+ event='options'><lotusscript>%REM
+	LS_Oracle_Lib
+	
+	Copyright © 2016-2017. All rights reserved.
+	@License: MIT (http://opensource.org/licenses/MIT)
+	
+	@Author:
+	Artem Areshko (Live Scripts)
+	Contacts:
+	http://live-scripts.blogspot.ru/
+	https://vk.com/livescriptslab
+	https://www.facebook.com/Live-Scripts-Lab-214495748709424/
+	
+	@Version: 2.0.0
+	
+	@Description:
+		Library contains interface to Oracle Db. It uses OO4O to get more options from
+		Oracle than standart LC Classes.
+%END REM
+
+Option Public
+Option Declare
+
+%REM
+	---=== History Log ===---
+	--- Version: X.X.X; DD.MM.YYYY; Name
+	1. 
+	
+%END REM
+
+</lotusscript></code><code event='declarations'><lotusscript>'=========================
+'===   P R I V A T E   ===
+'=== C O N S T A N T S ===
+'=========================
+'*** DESIGN KEY ***
+Private Const DESIGN = "LS_Oracle_Lib"
+
+'=========================
+'===    P U B L I C    ===
+'=== C O N S T A N T S ===
+'=========================
+'*** Library Error Codes
+Public Const ORA_ERR_PARAMEMPTY = 3500
+Public Const ORA_ERR_PARAMNOTHING = 3501
+Public Const ORA_ERR_PARAMNOTOBJECT = 3502
+Public Const ORA_ERR_OLEOBJECTFAIL = 3503
+
+'=========================
+'===   P R I V A T E   ===
+'=== V A R I A B L E S ===
+'=========================
+Private errStrings List As String
+
+%REM
+	Class OracleConnector
+	Description: Main Class. Est. connection
+%END REM
+Class OracleConnector
+	
+	Private OraSession As Variant
+	Private OraDatabase As Variant
+	
+	Private dbName As String
+	Private login As String
+	Private pwd As String
+	
+	%REM
+		Sub New
+		Description: Comments for Sub
+	%END REM
+	Public Sub New (DBName As String, userName As String, userPwd As String)
+		On Error GoTo ErrorHandler		
+		Const FuncName = "OracleConnector.New"
+		
+		Set Me.OraSession = Nothing
+		Set Me.OraDatabase = Nothing
+		
+		Call Me.InitializeDatabase(Dbname, userName, userPwd)
+
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Sub
+	
+	'NeedInitializeDatabase
+	%REM
+		@Description: 
+	%END REM
+	Private Function NeedInitializeDatabase(dbName As String, login As String, pwd As String) As Boolean
+		On Error GoTo ErrorHandler
+		Const FuncName = "IteratorOracle.NeedInitializeDatabase ()"
+		
+		NeedInitializeDatabase = True
+		
+		If Me.OraSession Is Nothing Or Me.OraDatabase Is Nothing Then
+			GoTo endh
+		ElseIf Me.dbName &lt;&gt; dbName Or Me.login &lt;&gt; login Or Me.pwd &lt;&gt; pwd Then
+			GoTo endh			
+		End If
+		
+		NeedInitializeDatabase = False
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Function
+	
+	'InitializeDatabase
+	%REM
+		@Description: 
+	%END REM
+	Public Function InitializeDatabase(dbName As String, login As String, pwd As String) As Boolean
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleConnector.InitializeDatabase ()"
+		
+		If Not Me.NeedInitializeDatabase(Dbname, Login, Pwd) Then GoTo endh
+		
+		Set Me.OraSession = CreateObject("OracleInProcServer.XOraSession")
+		If Me.OraSession Is Nothing Then Call RiseError(ORA_ERR_OLEOBJECTFAIL,"OracleInProcServer.XOraSession")
+		
+		Set Me.OraDatabase = OraSession.OpenDatabase(dbName, login &amp; "/" &amp; pwd, CInt(0))
+		
+		Me.dbName = dbName
+		Me.login = login
+		Me.pwd = pwd
+		
+		InitializeDatabase = True
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Function
+	
+	%REM
+		Function GetDataSet
+		Description: Comments for Function
+	%END REM
+	Public Function GetDataSet(sqlQuery As String) As OracleDataSet
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleConnector.GetDataSet ()"
+		
+		Dim oraDynaset As Variant
+		
+		Set oraDynaset = Me.OraDatabase.Createdynaset(sqlQuery, CInt(0))
+		Set GetDataSet = New OracleDataSet(Me, oraDynaset)
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:		
+	End Function
+	
+	'ExecuteSQL
+	%REM
+		@Description: 
+	%END REM
+	Public Function ExecuteSQL(sqlQuery As String) As Long
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleConnector.ExecuteSQL ()"
+		
+		ExecuteSQL = Me.OraDatabase.ExecuteSQL(sqlQuery)
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Function
+	
+End Class
+'*** OracleDataSet ***
+%REM
+	@Description: 
+%END REM
+Class OracleDataSet
+	
+	Private oracle As OracleConnector
+	Private OraDynaset As Variant
+	
+	'New
+	%REM
+		@Description: 
+	%END REM
+	Public Sub New(oraDb As OracleConnector, oraDynaset As Variant)
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleDataSet.New ()"
+		
+		If oraDb Is Nothing Then Call RiseError(ORA_ERR_PARAMNOTHING, "oraDb")
+		
+		If Not IsObject(oraDynaset) Then Call RiseError(ORA_ERR_PARAMNOTOBJECT, "oraDynaset")
+		If oraDynaset Is Nothing Then Call RiseError(ORA_ERR_PARAMNOTHING, "oraDynaset")
+		
+		Set Me.oracle = oraDb
+		Set Me.OraDynaset = oraDynaset
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Sub
+	
+	'MoveFirst
+	%REM
+		@Description: 
+	%END REM
+	Public Sub MoveFirst()
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleDataSet.MoveFirst ()"
+		
+		Me.OraDynaset.MoveFirst
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Sub
+	
+	'MoveNext
+	%REM
+		@Description: 
+	%END REM
+	Public Sub MoveNext()
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleDataSet.MoveNext ()"
+		
+		Me.OraDynaset.MoveNext
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Sub
+	
+	'MoveTo
+	%REM
+		@Description: 
+	%END REM
+	Public Sub MoveTo(n As Long)
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleDataSet.MoveTo ()"
+		
+		Me.OraDynaset.MoveTo n
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Sub
+	
+	'IsEOF
+	%REM
+		@Description: 
+	%END REM
+	Public Function IsEOF() As Boolean
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleDataSet.IsEOF ()"
+		
+		IsEOF = Me.OraDynaset.EOF
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Function
+	
+	'RecordCount
+	Public Property Get RecordCount As Long
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleDataSet.RecordCount GET"
+		
+		RecordCount = Me.OraDynaset.RecordCount
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Property
+	
+	'GetFieldValue
+	%REM
+		@Description: 
+	%END REM
+	Public Function GetFieldValue(fieldName As String) As Variant
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleDataSet.GetFieldValue ()"
+		
+		GetFieldValue = Me.OraDynaset.Fields(fieldName).Value
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Function
+	
+	'GetFields
+	%REM
+		@Description: 
+	%END REM
+	Public Function GetFields() As Variant
+		On Error GoTo ErrorHandler
+		Const FuncName = "OracleDataSet.GetFields ()"
+		
+		Set GetFields = Me.OraDynaset.Fields
+		
+		GoTo endh
+ErrorHandler:
+		Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+	End Function
+
+End Class
+</lotusscript></code><code event='InitErrorStrings'><lotusscript>'InitErrorStrings
+%REM
+	@Description: 
+%END REM
+Private Sub InitErrorStrings()
+	On Error GoTo ErrorHandler
+	Const FuncName = "InitErrorStrings ()"
+	
+	errStrings(ORA_ERR_PARAMEMPTY) = "Param can't be empty: "
+	errStrings(ORA_ERR_PARAMNOTHING) = "Param can't be empty: "
+	errStrings(ORA_ERR_PARAMNOTOBJECT) = "Param must an object: "
+	errStrings(ORA_ERR_OLEOBJECTFAIL) = "Failed to create OLE object: "
+	
+	GoTo endh
+ErrorHandler:
+	Error Err, "(" &amp; DESIGN &amp; ") " &amp; FuncName &amp; ", line " &amp; Erl &amp; Chr(10) &amp; Error$
+endh:
+End Sub
+
+</lotusscript></code><code event='RiseError'><lotusscript>'RiseError
+%REM
+	@Description: 
+%END REM
+Private Sub RiseError(errCode As Integer, param As String)
+	If param = "" Then
+		Error errCode, errStrings(errCode)
+	Else
+		Error errCode, errStrings(errCode) &amp; param
+	End If	
+End Sub
+</lotusscript></code></scriptlibrary>
+</database>
+
