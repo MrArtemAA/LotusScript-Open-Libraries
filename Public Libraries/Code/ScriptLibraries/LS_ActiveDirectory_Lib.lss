@@ -12,7 +12,7 @@
 	https://vk.com/livescriptslab
 	https://www.facebook.com/Live-Scripts-Lab-214495748709424/
 	
-	@Version: 2.1.0
+	@Version: 2.1.1
 	
 	@Description:
 		Library introducts interface to Microsoft Active Directory (MS AD) via LDAP. For 
@@ -24,6 +24,13 @@ Option Declare
 
 %REM
 	---=== History Log ===---
+	--- Version: 2.1.1; 27.09.2016; Artem Areshko
+	1. Method modified ADConnector.FindObj()
+		Signature fix topObj ADOU -> ADContainer
+	
+	2. Method modified ADOU.MoveHere()
+		Added detailed information in error handler
+	
 	--- Version: 2.1.0; 27.09.2016; Artem Areshko
 	1. Classes added
 		ADContainer
@@ -394,7 +401,7 @@ endh:
         objName - search key        
         SearchAtr - search attribute
 	%END REM
-	Public Function FindObj(topObj As ADOU, objType As String, objName As String, SearchAtr As String) As ADObject
+	Public Function FindObj(topObj As ADContainer, objType As String, objName As String, SearchAtr As String) As ADObject
 		On Error GoTo ErrorHandler
 		Const FuncName = "ADConnector.FindObj ()"
 
@@ -576,7 +583,7 @@ endh:
 		
 		GoTo endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Property
 	
@@ -823,7 +830,7 @@ Class ADGroup As ADObject
 		
 		GoTo endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -952,7 +959,7 @@ Class ADUser As ADObject
 		
 		GoTo endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -999,7 +1006,7 @@ Class ADContainer As ADObject
 		
 		GoTo endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -1025,7 +1032,8 @@ endh:
 		
 		GoTo endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$ & _
+		Chr(10) & "MoveTo: " & Me.DistinguishedName & "; NewName = " & tmpNewName
 endh:
 	End Function
 	
@@ -1051,7 +1059,7 @@ Class ADOU As ADContainer
 		
 		GoTo endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 	
@@ -1072,7 +1080,7 @@ Class ADDomain As ADContainer
 		
 		GoTo endh
 ErrorHandler:
-		Error Err, "(" & DESIGN & ") " & FuncName & ", стр. " & Erl & Chr(10) & Error$
+		Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 	End Sub
 
@@ -1162,3 +1170,4 @@ ErrorHandler:
 	Error Err, "(" & DESIGN & ") " & FuncName & ", line " & Erl & Chr(10) & Error$
 endh:
 End Function
+

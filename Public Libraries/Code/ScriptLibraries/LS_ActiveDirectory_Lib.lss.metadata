@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?><note class="filter" maintenanceversion="1.0" replicaid="43257F860056FF67" version="9.0" xmlns="http://www.lotus.com/dxl">
-<noteinfo noteid="192" sequence="38" unid="09BCCF82E59BDBB943257F86005841D8">
+<noteinfo noteid="192" sequence="50" unid="09BCCF82E59BDBB943257F86005841D8">
 <created><datetime>20160330T190400,24+03</datetime></created>
-<modified><datetime>20160927T114105,39+03</datetime></modified>
-<revised><datetime>20160927T114105,38+03</datetime></revised>
-<lastaccessed><datetime>20160927T114105,39+03</datetime></lastaccessed>
+<modified><datetime>20171026T131652,61+03</datetime></modified>
+<revised><datetime>20171026T131652,60+03</datetime></revised>
+<lastaccessed><datetime>20171026T131652,61+03</datetime></lastaccessed>
 <addedtofile><datetime>20160330T190400,37+03</datetime></addedtofile></noteinfo>
 <updatedby><name>CN=Artem A Areshko/O=LiveScripts/C=RU</name></updatedby>
 <wassignedby><name>CN=Artem A Areshko/O=LiveScripts/C=RU</name></wassignedby>
@@ -13,4 +13,4 @@
 <item name="$DesignerVersion" sign="true"><text>8.5.3</text></item>
 
 
-<item name="$Comment"><text>Version: 2.1.0</text></item></note>
+<item name="$Comment"><text>Version: 2.1.1</text></item></note>

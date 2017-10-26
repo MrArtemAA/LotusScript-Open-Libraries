@@ -1,21 +1,20 @@
 # Библиотеки для IBM Notes/Domino
 
 ## Описание
-Открытые библиотеки на языке LotusScript для IBM Notes/Domino
+Сборник библиотек с открытым исходным кодом на языке LotusScript для IBM Notes/Domino
 * Язык: LotusScript
 * Лицензия: [MIT](https://opensource.org/licenses/MIT)
-
-Сборник библиотек с открытым исходным кодом на языке LotusScript.
 
 Репозиторий содержит:
 * Domino-базу в виде On Disk Project с библиотеками и кодом агента для импорта из DXL-файл
 * Документацию по библиотекам
 * Библиотеки в виде DXL-файлов
 
-### [ActiveDirectory_Lib](docs/ru/active-directory-lib/main.md)
-Библиотека для платформы IBM Notes/Domino, облегчающая взаимодействие и интеграцию с MS Active Directory
-### [Oracle_Lib](docs/ru/oracle-lib/main.md)
-Библиотека для платформы IBM Notes/Domino для заимодействия с СУБД Oracle через COM-объекты OO4O
+### Библиотеки
+* [ActiveDirectory_Lib](docs/ru/active-directory-lib/main.md)
+	- Библиотека для платформы IBM Notes/Domino, облегчающая взаимодействие и интеграцию с MS Active Directory
+* [Oracle_Lib](docs/ru/oracle-lib/main.md)
+	- Библиотека для платформы IBM Notes/Domino для заимодействия с СУБД Oracle через COM-объекты OO4O
 
 ## Быстрый старт
 1. Перейдите в папку `\Public Libraries\Code\ScriptLibraries\`
